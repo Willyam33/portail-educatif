@@ -57,3 +57,6 @@ coverage.xml
 *.dump
 *.backup
 backups/
+
+# Claude Code local settings
+.claude/

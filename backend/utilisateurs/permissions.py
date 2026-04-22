@@ -25,3 +25,17 @@ class EstParentOuAdmin(BasePermission):
             and user.is_authenticated
             and (user.est_parent or user.est_administrateur)
         )
+
+
+def peut_consulter_eleve(user, eleve) -> bool:
+    """
+    Un parent ne peut consulter qu'un enfant rattaché à sa famille.
+    Les administrateurs peuvent tout consulter.
+    """
+    if not (user and user.is_authenticated):
+        return False
+    if user.est_administrateur:
+        return True
+    if user.est_parent and eleve.famille_id is not None:
+        return user.famille_id == eleve.famille_id
+    return False

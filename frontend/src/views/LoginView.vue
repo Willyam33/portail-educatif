@@ -16,8 +16,14 @@ async function seConnecter() {
   chargement.value = true
   try {
     await auth.connecter(username.value, password.value)
-    const cible = route.query.redirect || '/'
-    router.push(cible)
+    const redirection = route.query.redirect
+    if (redirection) {
+      router.push(redirection)
+    } else if (auth.estParent || auth.estAdmin) {
+      router.push({ name: 'parent' })
+    } else {
+      router.push({ name: 'accueil' })
+    }
   } catch (e) {
     if (e.response?.status === 401) {
       erreur.value = 'Identifiants incorrects.'

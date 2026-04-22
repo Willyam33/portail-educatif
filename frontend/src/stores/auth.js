@@ -22,6 +22,8 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     estConnecte: (state) => !!state.access,
     estEleve: (state) => state.utilisateur?.role === 'eleve',
+    estParent: (state) => state.utilisateur?.role === 'parent',
+    estAdmin: (state) => state.utilisateur?.role === 'administrateur',
   },
 
   actions: {
