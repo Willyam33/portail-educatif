@@ -4,6 +4,8 @@ from django.urls import path
 
 from .views import (
     HistoriqueTentativesView,
+    HistoriqueThematiquesView,
+    ProgressionDetailleeView,
     ProgressionMeView,
     RepondreView,
     TerminerTentativeView,
@@ -29,5 +31,15 @@ urlpatterns = [
         "eleve/progression/",
         ProgressionMeView.as_view(),
         name="eleve_progression",
+    ),
+    path(
+        "eleve/progression/detail/",
+        ProgressionDetailleeView.as_view(),
+        name="eleve_progression_detail",
+    ),
+    path(
+        "eleve/historique-thematiques/",
+        HistoriqueThematiquesView.as_view(),
+        name="eleve_historique_thematiques",
     ),
 ]

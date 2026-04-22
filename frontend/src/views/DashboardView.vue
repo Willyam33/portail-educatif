@@ -57,13 +57,21 @@ onMounted(charger)
           <h1 class="text-xl font-semibold text-slate-800">Bonjour, {{ auth.utilisateur?.first_name || auth.utilisateur?.username }}</h1>
           <p class="text-sm text-slate-500">Portail éducatif — 3<sup>e</sup></p>
         </div>
-        <button
-          type="button"
-          class="text-sm text-slate-600 hover:text-slate-900 underline"
-          @click="deconnexion"
-        >
-          Se déconnecter
-        </button>
+        <nav class="flex items-center gap-4 text-sm">
+          <router-link to="/historique" class="text-slate-600 hover:text-slate-900">
+            Historique
+          </router-link>
+          <router-link to="/progression" class="text-slate-600 hover:text-slate-900">
+            Progression
+          </router-link>
+          <button
+            type="button"
+            class="text-slate-600 hover:text-slate-900 underline"
+            @click="deconnexion"
+          >
+            Se déconnecter
+          </button>
+        </nav>
       </div>
     </header>
 

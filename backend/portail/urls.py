@@ -23,4 +23,5 @@ urlpatterns = [
     path("api/v1/", include("utilisateurs.urls")),
     path("api/v1/", include("contenu.urls")),
     path("api/v1/", include("progression.urls")),
+    path("api/v1/", include("ia.urls")),
 ]

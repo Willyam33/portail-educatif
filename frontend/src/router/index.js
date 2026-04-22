@@ -23,6 +23,16 @@ const routes = [
     name: 'qcm',
     component: () => import('@/views/QCMView.vue'),
   },
+  {
+    path: '/historique',
+    name: 'historique',
+    component: () => import('@/views/HistoriqueView.vue'),
+  },
+  {
+    path: '/progression',
+    name: 'progression',
+    component: () => import('@/views/ProgressionView.vue'),
+  },
 ]
 
 export const router = createRouter({

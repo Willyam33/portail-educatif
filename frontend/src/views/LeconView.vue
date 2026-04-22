@@ -6,6 +6,7 @@ import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { api } from '@/services/api'
+import QuestionsLibres from '@/components/QuestionsLibres.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,21 +83,27 @@ onMounted(charger)
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
-      <article v-else-if="donnees" class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
-        <div class="mb-4">
-          <span
-            class="inline-block px-2 py-0.5 rounded text-xs font-medium text-white"
-            :style="{ backgroundColor: donnees.thematique.matiere.couleur }"
-          >
-            {{ donnees.thematique.matiere.nom }}
-          </span>
-          <span class="text-sm text-slate-500 ml-2">
-            Durée de lecture estimée : {{ donnees.lecon.duree_lecture_estimee }} min
-          </span>
-        </div>
+      <template v-else-if="donnees">
+        <article class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+          <div class="mb-4">
+            <span
+              class="inline-block px-2 py-0.5 rounded text-xs font-medium text-white"
+              :style="{ backgroundColor: donnees.thematique.matiere.couleur }"
+            >
+              {{ donnees.thematique.matiere.nom }}
+            </span>
+            <span class="text-sm text-slate-500 ml-2">
+              Durée de lecture estimée : {{ donnees.lecon.duree_lecture_estimee }} min
+            </span>
+          </div>
 
-        <div class="lecon-contenu" v-html="contenuHtml" />
-      </article>
+          <div class="lecon-contenu" v-html="contenuHtml" />
+        </article>
+
+        <div class="mt-6">
+          <QuestionsLibres :thematique-id="donnees.thematique.id" />
+        </div>
+      </template>
     </main>
   </div>
 </template>

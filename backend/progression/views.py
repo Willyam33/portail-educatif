@@ -1,15 +1,16 @@
 """Vues API « progression » — réponses QCM, tentatives, récapitulatif élève."""
 
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contenu.models import Proposition, QuestionQCM
+from contenu.models import Matiere, Proposition, QuestionQCM
 from contenu.serializers import (
     CorrectionReponseSerializer,
+    MatiereSerializer,
     PropositionCorrigeeSerializer,
 )
 from utilisateurs.permissions import EstEleve
@@ -148,3 +149,116 @@ class ProgressionMeView(APIView):
                 "par_matiere": par_matiere,
             }
         )
+
+
+class ProgressionDetailleeView(APIView):
+    """
+    GET /eleve/progression/detail/
+
+    Renvoie, pour chaque matière, les indicateurs détaillés :
+    - nombre de leçons lues,
+    - nombre de QCM terminés,
+    - score moyen (en pourcentage),
+    - meilleur/pire score.
+    """
+
+    permission_classes = [EstEleve]
+
+    def get(self, request):
+        matieres = Matiere.objects.all().order_by("ordre")
+
+        tentatives_par_matiere = {
+            row["thematique__matiere_id"]: row
+            for row in (
+                TentativeQCM.objects.filter(eleve=request.user, terminee=True)
+                .values("thematique__matiere_id")
+                .annotate(
+                    nb_qcm=Count("id"),
+                    total_score=Sum("score"),
+                    total_questions=Sum("total_questions"),
+                )
+            )
+        }
+        lecons_par_matiere = {
+            row["thematique__matiere_id"]: row["nb"]
+            for row in (
+                ProgressionLecon.objects.filter(eleve=request.user, lecon_lue=True)
+                .values("thematique__matiere_id")
+                .annotate(nb=Count("id"))
+            )
+        }
+
+        resultat = []
+        for matiere in matieres:
+            stats = tentatives_par_matiere.get(matiere.id)
+            nb_qcm = stats["nb_qcm"] if stats else 0
+            total_questions = stats["total_questions"] if stats else 0
+            total_score = stats["total_score"] if stats else 0
+            score_pourcent = (
+                round(100 * total_score / total_questions, 1)
+                if total_questions
+                else None
+            )
+            resultat.append(
+                {
+                    "matiere": MatiereSerializer(matiere).data,
+                    "lecons_lues": lecons_par_matiere.get(matiere.id, 0),
+                    "qcm_termines": nb_qcm,
+                    "score_moyen_pourcent": score_pourcent,
+                }
+            )
+        return Response({"par_matiere": resultat})
+
+
+class HistoriqueThematiquesView(APIView):
+    """
+    GET /eleve/historique-thematiques/
+
+    Liste de toutes les thématiques sur lesquelles l'élève a une trace
+    (leçon lue et/ou QCM terminé), plus récentes d'abord.
+    """
+
+    permission_classes = [EstEleve]
+
+    def get(self, request):
+        # On part des thématiques ayant au moins une trace (leçon ou tentative).
+        tentatives = {
+            t.thematique_id: t
+            for t in TentativeQCM.objects.filter(
+                eleve=request.user, terminee=True
+            ).select_related("thematique__matiere")
+        }
+        progressions = {
+            p.thematique_id: p
+            for p in ProgressionLecon.objects.filter(
+                eleve=request.user, lecon_lue=True
+            ).select_related("thematique__matiere")
+        }
+
+        thematiques_ids = set(tentatives) | set(progressions)
+        entrees = []
+        for tid in thematiques_ids:
+            tentative = tentatives.get(tid)
+            progression = progressions.get(tid)
+            thematique = (tentative or progression).thematique
+            date_ref = (
+                tentative.date_fin
+                if tentative and tentative.date_fin
+                else progression.date_fin_lecture if progression
+                else None
+            )
+            entrees.append(
+                {
+                    "thematique_id": thematique.id,
+                    "titre": thematique.titre,
+                    "numero_jour": thematique.numero_jour,
+                    "matiere": MatiereSerializer(thematique.matiere).data,
+                    "lecon_lue": progression is not None,
+                    "qcm_termine": tentative is not None,
+                    "score": tentative.score if tentative else None,
+                    "total_questions": tentative.total_questions if tentative else None,
+                    "date": date_ref,
+                }
+            )
+        entrees.sort(key=lambda e: e["date"] or timezone.now(), reverse=True)
+        return Response(entrees)
