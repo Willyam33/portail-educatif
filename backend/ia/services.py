@@ -116,13 +116,14 @@ def _extraire_json(texte: str) -> dict:
 
 
 async def _appel_claude_async(
-    system_prompt: str, user_prompt: str
+    system_prompt: str, user_prompt: str, modele: str
 ) -> tuple[str, int, int]:
     """Lance un appel unique via claude-agent-sdk et retourne (texte, in, out)."""
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,
         allowed_tools=[],
         max_turns=1,
+        model=modele,
     )
 
     morceaux_texte: list[str] = []
@@ -145,11 +146,13 @@ async def _appel_claude_async(
     return texte, jetons_in, jetons_out
 
 
-def _appel_claude(system_prompt: str, user_prompt: str) -> tuple[str, int, int]:
+def _appel_claude(
+    system_prompt: str, user_prompt: str, modele: str
+) -> tuple[str, int, int]:
     """Adaptateur sync pour `_appel_claude_async` (utilisé depuis code Django sync)."""
     try:
         return anyio.run(
-            functools.partial(_appel_claude_async, system_prompt, user_prompt)
+            functools.partial(_appel_claude_async, system_prompt, user_prompt, modele)
         )
     except Exception as exc:  # noqa: BLE001
         raise GenerationError(f"Erreur côté Claude (SDK) : {exc}") from exc
@@ -198,7 +201,7 @@ class ServiceClaude:
         )
         try:
             texte, jetons_in, jetons_out = _appel_claude(
-                SYSTEM_PROMPT_QUESTION_LIBRE, user_prompt
+                SYSTEM_PROMPT_QUESTION_LIBRE, user_prompt, self._modele_questions
             )
         except GenerationError as exc:
             raise QuestionLibreError(str(exc)) from exc
@@ -247,7 +250,7 @@ class ServiceClaude:
             prerequis=thematique.prerequis or "(aucun)",
         )
         texte, jetons_in, jetons_out = _appel_claude(
-            SYSTEM_PROMPT_LECON, user_prompt
+            SYSTEM_PROMPT_LECON, user_prompt, self._modele_generation
         )
         cout = Decimal("0")
 
@@ -301,7 +304,7 @@ class ServiceClaude:
         )
 
         texte, jetons_in, jetons_out = _appel_claude(
-            SYSTEM_PROMPT_QCM, user_prompt
+            SYSTEM_PROMPT_QCM, user_prompt, self._modele_generation
         )
 
         try:
