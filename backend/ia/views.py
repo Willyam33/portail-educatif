@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from contenu.models import Thematique
+from contenu.views import STATUTS_CONSULTABLES
 from progression.models import QuestionLibre
 from utilisateurs.permissions import EstEleve
 
@@ -29,7 +30,7 @@ class QuestionsLibresView(APIView):
 
     def get(self, request, thematique_id):
         thematique = get_object_or_404(
-            Thematique.objects.filter(statut=Thematique.Statut.VALIDEE),
+            Thematique.objects.filter(statut__in=STATUTS_CONSULTABLES),
             pk=thematique_id,
         )
         questions = QuestionLibre.objects.filter(
@@ -45,9 +46,9 @@ class QuestionsLibresView(APIView):
 
     def post(self, request, thematique_id):
         thematique = get_object_or_404(
-            Thematique.objects.filter(statut=Thematique.Statut.VALIDEE).select_related(
-                "matiere"
-            ),
+            Thematique.objects.filter(
+                statut__in=STATUTS_CONSULTABLES
+            ).select_related("matiere"),
             pk=thematique_id,
         )
         question = (request.data.get("question") or "").strip()

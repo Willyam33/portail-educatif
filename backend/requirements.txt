@@ -11,8 +11,8 @@ dj-database-url>=2.2,<3.0
 # Configuration via variables d'environnement
 python-decouple>=3.8,<4.0
 
-# IA / Claude
-anthropic>=0.40,<1.0
+# IA / Claude — SDK pilotant le CLI Claude Code (auth OAuth abonnement Max)
+claude-agent-sdk>=0.1,<1.0
 
 # Outils de développement
 ipython>=8.0

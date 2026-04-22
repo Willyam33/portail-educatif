@@ -1,19 +1,36 @@
 """
-Service d'accès à l'API Anthropic — questions libres et génération de contenu.
+Service d'accès à Claude via le SDK Claude Code — utilise l'abonnement Claude Max.
 
-Ce service encapsule :
-- le filtrage des questions sensibles avant tout appel externe,
-- l'appel à Claude (Haiku pour les questions libres, Sonnet pour la génération),
-- l'enregistrement de la consommation (jetons + coût estimé) dans ConsommationAPI,
-- la persistance des entités générées (Lecon, QuestionQCM, Proposition, QuestionLibre).
+Les appels passent par `claude-agent-sdk`, qui pilote le CLI Claude Code en mode
+non-interactif. L'authentification est celle du CLI Claude Code (OAuth
+abonnement), donc les appels consomment le quota de l'abonnement Max 5x et ne
+sont pas facturés sur le compte API Anthropic.
+
+Différences par rapport à l'API Anthropic directe :
+- Pas de `tool_use` forcé : le QCM est demandé en JSON strict dans le prompt et
+  parsé côté Python (robuste car le SDK tolère les fences markdown).
+- ~2x plus lent (~30s par appel) à cause du démarrage du sous-processus Claude.
+- Coût facturé nul (abonnement), mais consommation de quota à surveiller.
+- Métriques conservées (jetons in/out) pour le suivi ; `cout_estime_euros` est
+  figé à 0 puisque l'abonnement couvre les appels.
 """
 
 from __future__ import annotations
 
+import functools
+import json
+import re
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
-import anthropic
+import anyio
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    TextBlock,
+    query,
+)
 from django.conf import settings
 from django.db import transaction
 
@@ -23,7 +40,6 @@ from progression.models import QuestionLibre
 from .filtres import contient_mot_clef_interdit
 from .models import ConsommationAPI
 from .prompts import (
-    OUTIL_ENREGISTRER_QCM,
     REPONSE_PRE_ECRITE_SUJET_SENSIBLE,
     SYSTEM_PROMPT_LECON,
     SYSTEM_PROMPT_QCM,
@@ -36,18 +52,8 @@ from .prompts import (
 )
 
 
-# Tarifs Claude Haiku 4.5 (USD par million de jetons). On les garde ici pour estimer
-# grossièrement le coût ; si les tarifs bougent, on met à jour le dictionnaire.
-TARIFS_USD_PAR_MILLION = {
-    "claude-haiku-4-5": {"input": 1.00, "output": 5.00},
-    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
-    "claude-opus-4-7": {"input": 5.00, "output": 25.00},
-    "claude-opus-4-6": {"input": 5.00, "output": 25.00},
-}
-TAUX_USD_VERS_EUR = Decimal("0.92")
-
-# Nombre de caractères du contenu de leçon envoyé en contexte.
-# On reste modeste pour limiter les jetons d'entrée (l'élève a déjà la leçon sous les yeux).
+# Longueur du résumé de leçon envoyé en contexte d'une question libre : on reste
+# modeste pour limiter les jetons (l'élève a déjà la leçon sous les yeux).
 LONGUEUR_MAX_RESUME_LECON = 2000
 
 
@@ -66,7 +72,7 @@ class ReponseIA:
     reponse: str
     jetons_entree: int
     jetons_sortie: int
-    filtree: bool  # True si interceptée par le filtre (pas d'appel API effectué)
+    filtree: bool  # True si interceptée par le filtre (pas d'appel SDK effectué)
     question_libre: QuestionLibre
 
 
@@ -76,24 +82,13 @@ class ResultatGeneration:
 
     jetons_entree: int
     jetons_sortie: int
-    cout_eur: Decimal
-    # Une des deux valeurs est renseignée selon le type d'appel :
+    cout_eur: Decimal  # Toujours 0 via abonnement ; conservé pour compat API.
     lecon: Lecon | None = None
     questions: list[QuestionQCM] | None = None
 
 
-def _cout_estime_eur(modele: str, jetons_entree: int, jetons_sortie: int) -> Decimal:
-    tarifs = TARIFS_USD_PAR_MILLION.get(modele)
-    if not tarifs:
-        return Decimal("0")
-    cout_usd = Decimal(jetons_entree) * Decimal(str(tarifs["input"])) / Decimal(1_000_000)
-    cout_usd += Decimal(jetons_sortie) * Decimal(str(tarifs["output"])) / Decimal(1_000_000)
-    cout_eur = cout_usd * TAUX_USD_VERS_EUR
-    return cout_eur.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
-
-
 def _resume_lecon(thematique: Thematique) -> str:
-    """Extrait un contexte court de la leçon pour alimenter le prompt utilisateur."""
+    """Extrait un contexte court de la leçon pour alimenter un prompt utilisateur."""
     lecon = getattr(thematique, "lecon", None)
     if not lecon or not lecon.contenu:
         return "(pas de leçon disponible)"
@@ -103,25 +98,71 @@ def _resume_lecon(thematique: Thematique) -> str:
     return contenu[:LONGUEUR_MAX_RESUME_LECON] + "…"
 
 
+def _extraire_json(texte: str) -> dict:
+    """Extrait un objet JSON d'une réponse texte (tolère les fences markdown)."""
+    texte = texte.strip()
+    try:
+        return json.loads(texte)
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", texte, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+    debut = texte.find("{")
+    fin = texte.rfind("}")
+    if debut >= 0 and fin > debut:
+        return json.loads(texte[debut : fin + 1])
+    raise ValueError("Aucun objet JSON valide trouvé dans la réponse.")
+
+
+async def _appel_claude_async(
+    system_prompt: str, user_prompt: str
+) -> tuple[str, int, int]:
+    """Lance un appel unique via claude-agent-sdk et retourne (texte, in, out)."""
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        allowed_tools=[],
+        max_turns=1,
+    )
+
+    morceaux_texte: list[str] = []
+    jetons_in = 0
+    jetons_out = 0
+
+    async for msg in query(prompt=user_prompt, options=options):
+        if isinstance(msg, AssistantMessage):
+            for block in msg.content:
+                if isinstance(block, TextBlock):
+                    morceaux_texte.append(block.text)
+        elif isinstance(msg, ResultMessage):
+            usage = msg.usage or {}
+            jetons_in = int(usage.get("input_tokens", 0) or 0)
+            jetons_out = int(usage.get("output_tokens", 0) or 0)
+
+    texte = "".join(morceaux_texte).strip()
+    if not texte:
+        raise GenerationError("Réponse vide reçue de Claude.")
+    return texte, jetons_in, jetons_out
+
+
+def _appel_claude(system_prompt: str, user_prompt: str) -> tuple[str, int, int]:
+    """Adaptateur sync pour `_appel_claude_async` (utilisé depuis code Django sync)."""
+    try:
+        return anyio.run(
+            functools.partial(_appel_claude_async, system_prompt, user_prompt)
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise GenerationError(f"Erreur côté Claude (SDK) : {exc}") from exc
+
+
 class ServiceClaude:
-    """Client applicatif autour du SDK Anthropic."""
+    """Client applicatif utilisant claude-agent-sdk + l'abonnement Claude Max."""
 
     def __init__(self) -> None:
-        # Client instancié à la demande : on ne bloque pas si la clé est absente
-        # tant que le filtre local n'a pas eu sa chance.
-        self._client = None
-        self._modele = settings.ANTHROPIC_MODEL_QUESTIONS_LIBRES
+        # Les noms de modèles restent dans les settings pour traçabilité dans
+        # `ConsommationAPI`, même si le SDK utilise le modèle actif de Claude Code.
+        self._modele_questions = settings.ANTHROPIC_MODEL_QUESTIONS_LIBRES
         self._modele_generation = settings.ANTHROPIC_MODEL_GENERATION
-
-    def _client_anthropic(self):
-        if self._client is not None:
-            return self._client
-        if not settings.ANTHROPIC_API_KEY:
-            raise QuestionLibreError(
-                "Clé API Anthropic absente : impossible d'appeler Claude."
-            )
-        self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        return self._client
 
     def repondre_question_libre(
         self, *, question: str, thematique: Thematique, eleve,
@@ -130,7 +171,7 @@ class ServiceClaude:
         if not question_nettoyee:
             raise QuestionLibreError("La question est vide.")
 
-        # 1. Filtrage garde-fous (aucun appel API si mot-clé interdit).
+        # 1. Filtrage garde-fous : aucun appel si mot-clé interdit détecté.
         if contient_mot_clef_interdit(question_nettoyee):
             question_libre = QuestionLibre.objects.create(
                 eleve=eleve,
@@ -148,8 +189,7 @@ class ServiceClaude:
                 question_libre=question_libre,
             )
 
-        # 2. Appel à Claude.
-        client = self._client_anthropic()
+        # 2. Appel à Claude via le SDK (abonnement Max).
         user_prompt = USER_PROMPT_QUESTION_LIBRE.format(
             matiere=thematique.matiere.nom,
             titre_thematique=thematique.titre,
@@ -157,56 +197,33 @@ class ServiceClaude:
             question_eleve=question_nettoyee,
         )
         try:
-            message = client.messages.create(
-                model=self._modele,
-                max_tokens=800,
-                temperature=0.6,
-                system=SYSTEM_PROMPT_QUESTION_LIBRE,
-                messages=[{"role": "user", "content": user_prompt}],
+            texte, jetons_in, jetons_out = _appel_claude(
+                SYSTEM_PROMPT_QUESTION_LIBRE, user_prompt
             )
-        except anthropic.APIConnectionError as exc:
-            raise QuestionLibreError(
-                "Impossible de joindre Claude pour le moment."
-            ) from exc
-        except anthropic.RateLimitError as exc:
-            raise QuestionLibreError(
-                "Claude est surchargé, réessaie dans un instant."
-            ) from exc
-        except anthropic.APIError as exc:
-            raise QuestionLibreError(
-                "Une erreur est survenue côté Claude."
-            ) from exc
+        except GenerationError as exc:
+            raise QuestionLibreError(str(exc)) from exc
 
-        texte = "".join(
-            block.text for block in message.content if getattr(block, "type", None) == "text"
-        ).strip()
-        if not texte:
-            raise QuestionLibreError("Réponse vide reçue de Claude.")
-
-        jetons_entree = int(message.usage.input_tokens or 0)
-        jetons_sortie = int(message.usage.output_tokens or 0)
-
-        # 3. Enregistrement consommation + question libre (en base).
+        # 3. Enregistrement consommation + question libre (coût 0 via abonnement).
         ConsommationAPI.objects.create(
             utilisateur=eleve,
             type_appel=ConsommationAPI.TypeAppel.QUESTION_LIBRE,
-            modele=self._modele,
-            jetons_entree=jetons_entree,
-            jetons_sortie=jetons_sortie,
-            cout_estime_euros=_cout_estime_eur(self._modele, jetons_entree, jetons_sortie),
+            modele=self._modele_questions,
+            jetons_entree=jetons_in,
+            jetons_sortie=jetons_out,
+            cout_estime_euros=Decimal("0"),
         )
         question_libre = QuestionLibre.objects.create(
             eleve=eleve,
             thematique=thematique,
             question=question_nettoyee,
             reponse=texte,
-            jetons_entree=jetons_entree,
-            jetons_sortie=jetons_sortie,
+            jetons_entree=jetons_in,
+            jetons_sortie=jetons_out,
         )
         return ReponseIA(
             reponse=texte,
-            jetons_entree=jetons_entree,
-            jetons_sortie=jetons_sortie,
+            jetons_entree=jetons_in,
+            jetons_sortie=jetons_out,
             filtree=False,
             question_libre=question_libre,
         )
@@ -215,45 +232,11 @@ class ServiceClaude:
     # Génération de contenu (leçons + QCM)
     # ------------------------------------------------------------------
 
-    def _appel_generation(
-        self,
-        *,
-        system_prompt: str,
-        user_prompt: str,
-        max_tokens: int,
-        temperature: float,
-    ) -> tuple[str, int, int]:
-        """Appel brut à Claude Sonnet pour la génération ; retourne (texte, in, out)."""
-        client = self._client_anthropic()
-        try:
-            message = client.messages.create(
-                model=self._modele_generation,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-        except anthropic.APIConnectionError as exc:
-            raise GenerationError("Impossible de joindre Claude pour le moment.") from exc
-        except anthropic.RateLimitError as exc:
-            raise GenerationError("Claude est surchargé, réessaie dans un instant.") from exc
-        except anthropic.APIError as exc:
-            raise GenerationError(f"Erreur côté Claude : {exc}") from exc
-
-        texte = "".join(
-            block.text for block in message.content if getattr(block, "type", None) == "text"
-        ).strip()
-        if not texte:
-            raise GenerationError("Réponse vide reçue de Claude.")
-        return (
-            texte,
-            int(message.usage.input_tokens or 0),
-            int(message.usage.output_tokens or 0),
-        )
-
     def generer_lecon(self, thematique: Thematique) -> ResultatGeneration:
-        """Génère la leçon Markdown d'une thématique via Claude Sonnet 4.6."""
-        chapitre_titre = thematique.chapitre.titre if thematique.chapitre else "(non précisé)"
+        """Génère la leçon Markdown d'une thématique via le SDK."""
+        chapitre_titre = (
+            thematique.chapitre.titre if thematique.chapitre else "(non précisé)"
+        )
         user_prompt = USER_PROMPT_LECON.format(
             matiere=thematique.matiere.nom,
             titre_thematique=thematique.titre,
@@ -263,13 +246,10 @@ class ServiceClaude:
             notions=thematique.notions or "(non précisées)",
             prerequis=thematique.prerequis or "(aucun)",
         )
-        texte, jetons_in, jetons_out = self._appel_generation(
-            system_prompt=SYSTEM_PROMPT_LECON,
-            user_prompt=user_prompt,
-            max_tokens=4000,
-            temperature=0.5,
+        texte, jetons_in, jetons_out = _appel_claude(
+            SYSTEM_PROMPT_LECON, user_prompt
         )
-        cout = _cout_estime_eur(self._modele_generation, jetons_in, jetons_out)
+        cout = Decimal("0")
 
         with transaction.atomic():
             lecon, _ = Lecon.objects.update_or_create(
@@ -302,9 +282,9 @@ class ServiceClaude:
     def generer_qcm(self, thematique: Thematique) -> ResultatGeneration:
         """Génère le QCM d'une thématique à partir de sa leçon déjà produite.
 
-        Utilise un tool forcé côté Anthropic pour garantir un JSON valide : Claude
-        renvoie ses questions en appelant l'outil `enregistrer_qcm`, et le SDK
-        valide automatiquement le JSON contre le schéma défini.
+        Demande un JSON strict dans la réponse (le SDK Claude Code ne supporte
+        pas le `tool_use` forcé). La réponse est parsée côté Python avec une
+        tolérance pour les fences markdown éventuelles.
         """
         lecon = getattr(thematique, "lecon", None)
         if lecon is None or not lecon.contenu.strip():
@@ -320,48 +300,26 @@ class ServiceClaude:
             contenu_lecon=lecon.contenu,
         )
 
-        client = self._client_anthropic()
-        try:
-            message = client.messages.create(
-                model=self._modele_generation,
-                max_tokens=8000,
-                temperature=0.3,
-                system=SYSTEM_PROMPT_QCM,
-                tools=[OUTIL_ENREGISTRER_QCM],
-                tool_choice={"type": "tool", "name": "enregistrer_qcm"},
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-        except anthropic.APIConnectionError as exc:
-            raise GenerationError("Impossible de joindre Claude pour le moment.") from exc
-        except anthropic.RateLimitError as exc:
-            raise GenerationError("Claude est surchargé, réessaie dans un instant.") from exc
-        except anthropic.APIError as exc:
-            raise GenerationError(f"Erreur côté Claude : {exc}") from exc
-
-        jetons_in = int(message.usage.input_tokens or 0)
-        jetons_out = int(message.usage.output_tokens or 0)
-        cout = _cout_estime_eur(self._modele_generation, jetons_in, jetons_out)
-
-        if message.stop_reason == "max_tokens":
-            raise GenerationError(
-                "La réponse a été tronquée (max_tokens atteint) : le QCM est incomplet. "
-                "Augmente max_tokens ou réduis le contenu de la leçon."
-            )
-
-        tool_use = next(
-            (b for b in message.content if getattr(b, "type", None) == "tool_use"),
-            None,
+        texte, jetons_in, jetons_out = _appel_claude(
+            SYSTEM_PROMPT_QCM, user_prompt
         )
-        if tool_use is None:
+
+        try:
+            donnees = _extraire_json(texte)
+        except (ValueError, json.JSONDecodeError) as exc:
             raise GenerationError(
-                "Claude n'a pas appelé l'outil `enregistrer_qcm` (aucun tool_use dans la réponse)."
-            )
-        questions_brutes = (tool_use.input or {}).get("questions") or []
+                f"Le JSON du QCM est invalide : {exc}. "
+                f"Début de la réponse : {texte[:200]}…"
+            ) from exc
+
+        questions_brutes = donnees.get("questions") or []
         if not questions_brutes:
             raise GenerationError("Le QCM généré ne contient aucune question.")
 
+        cout = Decimal("0")
+
         with transaction.atomic():
-            # Remplacement atomique : on supprime les anciennes questions et propositions.
+            # Remplacement atomique : on supprime d'abord les anciennes questions.
             thematique.questions.all().delete()
             questions_creees: list[QuestionQCM] = []
             for q in questions_brutes:
@@ -373,7 +331,8 @@ class ServiceClaude:
                 nb_correctes = sum(1 for p in propositions if p.get("est_correcte"))
                 if nb_correctes != 1:
                     raise GenerationError(
-                        f"Question {q.get('ordre')} : {nb_correctes} réponses correctes (attendu 1)."
+                        f"Question {q.get('ordre')} : {nb_correctes} réponses "
+                        f"correctes (attendu 1)."
                     )
                 question = QuestionQCM.objects.create(
                     thematique=thematique,
@@ -409,5 +368,3 @@ class ServiceClaude:
             cout_eur=cout,
             questions=questions_creees,
         )
-
-

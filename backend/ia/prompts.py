@@ -218,7 +218,7 @@ Pour chaque question, tu fournis :
 
 
 USER_PROMPT_QCM = """\
-Génère un QCM complet pour évaluer la compréhension de la leçon suivante, puis enregistre-le en appelant l'outil `enregistrer_qcm` avec les questions générées.
+Génère un QCM complet pour évaluer la compréhension de la leçon suivante.
 
 INFORMATIONS SUR LA THÉMATIQUE :
 - Matière : {matiere}
@@ -230,75 +230,41 @@ CONTENU DE LA LEÇON :
 
 INSTRUCTIONS :
 - Génère entre 5 et 15 questions selon la richesse du contenu (8 à 10 est l'objectif standard).
-- Organise les questions de la plus facile à la plus difficile.
+- Organise les questions de la plus facile à la plus difficile (difficulte 1 à 3).
 - Couvre l'ensemble des notions de la leçon, pas seulement le début.
-- Pour chaque question, propose 4 réponses dont une seule correcte.
+- Pour chaque question, propose EXACTEMENT 4 propositions dont UNE SEULE correcte.
 - Varie la position de la bonne réponse (pas toujours en 1 ou 2).
 - Pour chaque proposition, fournis une explication brève (correcte ou non).
 - Pour les formules mathématiques ou notations chimiques, utilise LaTeX entre $...$.
 
-Appelle maintenant l'outil `enregistrer_qcm`.
+FORMAT DE SORTIE STRICT :
+Tu réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, sans bloc Markdown ```json```. Le JSON doit suivre EXACTEMENT ce schéma :
+
+{{
+  "questions": [
+    {{
+      "ordre": 1,
+      "enonce": "...",
+      "difficulte": 1,
+      "explication_generale": "...",
+      "propositions": [
+        {{"ordre": 1, "texte": "...", "est_correcte": false, "explication": "..."}},
+        {{"ordre": 2, "texte": "...", "est_correcte": true,  "explication": "..."}},
+        {{"ordre": 3, "texte": "...", "est_correcte": false, "explication": "..."}},
+        {{"ordre": 4, "texte": "...", "est_correcte": false, "explication": "..."}}
+      ]
+    }}
+  ]
+}}
+
+Contraintes à respecter strictement :
+- `difficulte` est un entier 1, 2 ou 3.
+- Chaque question a EXACTEMENT 4 propositions numérotées de 1 à 4.
+- Une seule proposition par question a `est_correcte: true`.
+- Les caractères spéciaux dans les textes (guillemets, antislashs LaTeX) doivent être correctement échappés en JSON.
+- Réponds avec le JSON uniquement, rien d'autre.
 """
 
 
-# Schéma de l'outil tool_use forcé pour la génération du QCM.
-# Anthropic valide le JSON produit : on est garantis d'obtenir un objet bien formé.
-OUTIL_ENREGISTRER_QCM = {
-    "name": "enregistrer_qcm",
-    "description": "Enregistre un QCM généré pour une leçon de troisième.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "questions": {
-                "type": "array",
-                "minItems": 5,
-                "maxItems": 15,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "ordre": {"type": "integer", "minimum": 1},
-                        "enonce": {"type": "string"},
-                        "difficulte": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 3,
-                        },
-                        "explication_generale": {"type": "string"},
-                        "propositions": {
-                            "type": "array",
-                            "minItems": 4,
-                            "maxItems": 4,
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "ordre": {"type": "integer", "minimum": 1, "maximum": 4},
-                                    "texte": {"type": "string"},
-                                    "est_correcte": {"type": "boolean"},
-                                    "explication": {"type": "string"},
-                                },
-                                "required": [
-                                    "ordre",
-                                    "texte",
-                                    "est_correcte",
-                                    "explication",
-                                ],
-                            },
-                        },
-                    },
-                    "required": [
-                        "ordre",
-                        "enonce",
-                        "difficulte",
-                        "explication_generale",
-                        "propositions",
-                    ],
-                },
-            }
-        },
-        "required": ["questions"],
-    },
-}
-
-
 VERSION_PROMPT_LECON = "lecon-1.0"
-VERSION_PROMPT_QCM = "qcm-1.0"
+VERSION_PROMPT_QCM = "qcm-2.0"  # v2 : JSON strict dans la réponse (SDK claude-agent-sdk)

@@ -104,3 +104,25 @@ class CorrectionReponseSerializer(serializers.Serializer):
     correcte = serializers.BooleanField()
     explication_generale = serializers.CharField()
     propositions = PropositionCorrigeeSerializer(many=True)
+
+
+class ThematiqueEnMenuSerializer(serializers.Serializer):
+    """Thématique dans le menu « Explorer par matière »."""
+
+    id = serializers.IntegerField()
+    numero_dans_matiere = serializers.IntegerField()
+    numero_jour = serializers.IntegerField(allow_null=True)
+    titre = serializers.CharField()
+    difficulte = serializers.IntegerField()
+    statut = serializers.CharField()
+    lecon_disponible = serializers.BooleanField()
+    qcm_disponible = serializers.BooleanField()
+    lecon_lue = serializers.BooleanField()
+    qcm_termine = serializers.BooleanField()
+
+
+class MatiereAvecThematiquesSerializer(serializers.Serializer):
+    """Matière + ses thématiques pour le menu élève."""
+
+    matiere = MatiereSerializer()
+    thematiques = ThematiqueEnMenuSerializer(many=True)

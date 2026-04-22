@@ -5,6 +5,7 @@ from django.urls import path
 from .views import (
     LeconView,
     MarquerLeconLueView,
+    MatieresVueEleveView,
     QCMView,
     ThematiqueDuJourView,
 )
@@ -14,6 +15,11 @@ urlpatterns = [
         "eleve/thematique-du-jour/",
         ThematiqueDuJourView.as_view(),
         name="eleve_thematique_du_jour",
+    ),
+    path(
+        "eleve/matieres/",
+        MatieresVueEleveView.as_view(),
+        name="eleve_matieres",
     ),
     path(
         "eleve/thematiques/<int:thematique_id>/lecon/",

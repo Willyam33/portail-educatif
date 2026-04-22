@@ -1,5 +1,7 @@
 """Vues API « contenu » pour l'espace élève."""
 
+from collections import defaultdict
+
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -9,22 +11,29 @@ from rest_framework.views import APIView
 from progression.models import ProgressionLecon, TentativeQCM
 from utilisateurs.permissions import EstEleve
 
-from .models import Lecon, Thematique
+from .models import Lecon, Matiere, Thematique
 from .serializers import (
     LeconSerializer,
+    MatiereAvecThematiquesSerializer,
     QuestionElevesSerializer,
     ThematiqueDetailSerializer,
     ThematiqueListSerializer,
 )
 
 
+STATUTS_CONSULTABLES = {
+    Thematique.Statut.GENEREE,
+    Thematique.Statut.VALIDEE,
+}
+
+
 def _thematiques_accessibles(eleve):
     """
-    Thématiques que l'élève peut consulter : validées et dont numero_jour
-    est attribué. Extensible plus tard à la date réelle / niveau.
+    Thématiques que l'élève peut consulter : celles dont le contenu est prêt
+    (généré ou validé) et dont numero_jour est attribué.
     """
     return Thematique.objects.filter(
-        statut=Thematique.Statut.VALIDEE,
+        statut__in=STATUTS_CONSULTABLES,
         numero_jour__isnull=False,
     ).select_related("matiere")
 
@@ -121,6 +130,70 @@ class MarquerLeconLueView(APIView):
             progression.date_fin_lecture = timezone.now()
             progression.save(update_fields=["lecon_lue", "date_fin_lecture"])
         return Response({"lecon_lue": True})
+
+
+class MatieresVueEleveView(APIView):
+    """
+    GET /eleve/matieres/ — retourne les 7 matières du programme avec, pour
+    chacune, la liste de ses thématiques. Inclut toutes les thématiques du
+    programme (même celles dont la leçon n'est pas encore générée), avec un
+    flag `lecon_disponible` / `qcm_disponible` pour piloter l'UI.
+    """
+
+    permission_classes = [EstEleve]
+
+    def get(self, request):
+        thematiques = (
+            Thematique.objects.select_related("matiere")
+            .prefetch_related("lecon", "questions")
+            .order_by("matiere__ordre", "numero_dans_matiere")
+        )
+
+        # Progression de l'élève pour afficher les petits badges "fait/en cours".
+        progressions_lecon = {
+            p.thematique_id: p.lecon_lue
+            for p in ProgressionLecon.objects.filter(eleve=request.user)
+        }
+        qcm_termines = set(
+            TentativeQCM.objects.filter(eleve=request.user, terminee=True).values_list(
+                "thematique_id", flat=True
+            )
+        )
+
+        par_matiere: dict[int, list[Thematique]] = defaultdict(list)
+        for t in thematiques:
+            par_matiere[t.matiere_id].append(t)
+
+        matieres = Matiere.objects.order_by("ordre")
+        resultat = []
+        for matiere in matieres:
+            liste = par_matiere.get(matiere.id, [])
+            resultat.append(
+                {
+                    "matiere": matiere,
+                    "thematiques": [
+                        {
+                            "id": t.id,
+                            "numero_dans_matiere": t.numero_dans_matiere,
+                            "numero_jour": t.numero_jour,
+                            "titre": t.titre,
+                            "difficulte": t.difficulte,
+                            "statut": t.statut,
+                            "lecon_disponible": (
+                                hasattr(t, "lecon") and t.statut in STATUTS_CONSULTABLES
+                            ),
+                            "qcm_disponible": (
+                                t.questions.exists() and t.statut in STATUTS_CONSULTABLES
+                            ),
+                            "lecon_lue": progressions_lecon.get(t.id, False),
+                            "qcm_termine": t.id in qcm_termines,
+                        }
+                        for t in liste
+                    ],
+                }
+            )
+
+        return Response(MatiereAvecThematiquesSerializer(resultat, many=True).data)
 
 
 class QCMView(APIView):

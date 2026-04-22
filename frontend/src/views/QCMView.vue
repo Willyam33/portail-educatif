@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/services/api'
+import TexteRiche from '@/components/TexteRiche.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,7 +203,7 @@ onMounted(charger)
           Question {{ indexCourant + 1 }} / {{ nbQuestions }}
         </p>
         <h2 class="text-xl font-semibold text-slate-800">
-          {{ questionCourante.enonce }}
+          <TexteRiche :texte="questionCourante.enonce" inline />
         </h2>
 
         <div class="space-y-3">
@@ -215,12 +216,17 @@ onMounted(charger)
             :class="classeProp(prop)"
             @click="repondre(prop)"
           >
-            <span class="font-medium">{{ prop.texte }}</span>
+            <span class="font-medium">
+              <TexteRiche :texte="prop.texte" inline />
+            </span>
             <p
               v-if="correctionCourante && !correctionCourante.partielle"
               class="mt-1 text-sm text-slate-600"
             >
-              {{ correctionCourante.propositions.find((p) => p.id === prop.id)?.explication }}
+              <TexteRiche
+                :texte="correctionCourante.propositions.find((p) => p.id === prop.id)?.explication || ''"
+                inline
+              />
             </p>
           </button>
         </div>
@@ -230,7 +236,7 @@ onMounted(charger)
           class="bg-slate-50 border border-slate-200 rounded p-4 text-sm text-slate-700"
         >
           <strong>Explication :</strong>
-          {{ correctionCourante.explication_generale }}
+          <TexteRiche :texte="correctionCourante.explication_generale" inline />
         </div>
 
         <div class="flex justify-between pt-2">
