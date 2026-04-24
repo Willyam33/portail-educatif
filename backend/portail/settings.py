@@ -34,6 +34,16 @@ ALLOWED_HOSTS = config(
     cast=Csv(),
 )
 
+# Derrière un reverse proxy (nginx) qui termine TLS : Django doit savoir qu'il
+# sert en HTTPS pour construire les URLs absolues correctement et faire passer
+# la vérification CSRF sur les POST admin.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Liste explicite des origines acceptées pour la vérification CSRF (obligatoire
+# depuis Django 4 dès que le schéma doit être contrôlé : tous les hôtes de
+# ALLOWED_HOSTS sont automatiquement rajoutés en https:// + http://.
+CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host not in ("localhost", "127.0.0.1")]
+
 
 # --- Applications -----------------------------------------------------------
 
