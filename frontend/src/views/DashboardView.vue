@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -13,6 +13,34 @@ const matieres = ref([])
 const matiereOuverteId = ref(null)
 const erreur = ref('')
 const chargement = ref(true)
+
+const dateAujourdhui = computed(() =>
+  new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+)
+
+const joursAvantBrevet = computed(() => {
+  const aujourdhui = new Date()
+  aujourdhui.setHours(0, 0, 0, 0)
+  let brevet = new Date(aujourdhui.getFullYear(), 5, 26)
+  if (brevet < aujourdhui) {
+    brevet = new Date(aujourdhui.getFullYear() + 1, 5, 26)
+  }
+  return Math.round((brevet - aujourdhui) / 86_400_000)
+})
+
+const totalLecons = computed(() =>
+  matieres.value.reduce(
+    (sum, item) => sum + item.thematiques.filter((t) => t.lecon_disponible).length,
+    0,
+  ),
+)
+
+const totalQCM = computed(() =>
+  matieres.value.reduce(
+    (sum, item) => sum + item.thematiques.filter((t) => t.qcm_disponible).length,
+    0,
+  ),
+)
 
 async function charger() {
   chargement.value = true
@@ -96,6 +124,12 @@ onMounted(charger)
           v-if="thematique"
           class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-4"
         >
+          <div class="flex items-baseline justify-between border-b border-slate-100 pb-3">
+            <p class="text-sm text-slate-500">Suggestion du {{ dateAujourdhui }}</p>
+            <p class="text-sm font-medium text-indigo-700">
+              Brevet des collèges — J-{{ joursAvantBrevet }}
+            </p>
+          </div>
           <div class="flex items-start justify-between">
             <div>
               <span
@@ -107,9 +141,6 @@ onMounted(charger)
               <h2 class="mt-2 text-2xl font-semibold text-slate-800">
                 {{ thematique.titre }}
               </h2>
-              <p class="text-sm text-slate-500 mt-1">
-                Jour {{ thematique.jour_courant }} / 180 — à travailler aujourd'hui
-              </p>
             </div>
           </div>
 
@@ -144,11 +175,15 @@ onMounted(charger)
           <h3 class="text-lg font-semibold text-slate-800 mb-3">Ma progression</h3>
           <div class="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p class="text-2xl font-semibold text-slate-800">{{ progression.lecons_lues }}</p>
+              <p class="text-2xl font-semibold text-slate-800">
+                {{ progression.lecons_lues }} / {{ totalLecons }}
+              </p>
               <p class="text-xs text-slate-500">leçons lues</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold text-slate-800">{{ progression.qcm_termines }}</p>
+              <p class="text-2xl font-semibold text-slate-800">
+                {{ progression.qcm_termines }} / {{ totalQCM }}
+              </p>
               <p class="text-xs text-slate-500">QCM terminés</p>
             </div>
             <div>

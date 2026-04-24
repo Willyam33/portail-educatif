@@ -92,7 +92,7 @@ onMounted(charger)
                 {{ entree.matiere.nom }}
               </span>
               <span class="text-xs text-slate-500">
-                Jour {{ entree.numero_jour }} · {{ formaterDate(entree.date) }}
+                {{ formaterDate(entree.date) }}
               </span>
             </div>
             <h2 class="mt-1 text-lg font-semibold text-slate-800">
