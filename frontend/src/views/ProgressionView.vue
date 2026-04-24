@@ -37,40 +37,40 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-      <div class="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 flex items-center justify-between gap-3">
         <button
           type="button"
-          class="text-sm text-slate-600 hover:text-slate-900"
+          class="text-sm text-slate-600 hover:text-slate-900 shrink-0"
           @click="retour"
         >
           ← Retour
         </button>
-        <h1 class="text-lg font-semibold text-slate-800">Ma progression</h1>
-        <span />
+        <h1 class="text-base sm:text-lg font-semibold text-slate-800 truncate">Ma progression</h1>
+        <span class="shrink-0 w-12" />
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-6">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
       <template v-else>
         <section
           v-if="global"
-          class="bg-white rounded-lg shadow-sm border border-slate-200 p-6"
+          class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6"
         >
           <h2 class="text-base font-semibold text-slate-800 mb-3">Vue d'ensemble</h2>
-          <div class="grid grid-cols-3 gap-4 text-center">
+          <div class="grid grid-cols-3 gap-2 sm:gap-4 text-center">
             <div>
-              <p class="text-3xl font-semibold text-slate-800">{{ global.lecons_lues }}</p>
+              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">{{ global.lecons_lues }}</p>
               <p class="text-xs text-slate-500 mt-1">leçons lues</p>
             </div>
             <div>
-              <p class="text-3xl font-semibold text-slate-800">{{ global.qcm_termines }}</p>
+              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">{{ global.qcm_termines }}</p>
               <p class="text-xs text-slate-500 mt-1">QCM terminés</p>
             </div>
             <div>
-              <p class="text-3xl font-semibold text-slate-800">
+              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">
                 {{ global.score_moyen_pourcent !== null ? global.score_moyen_pourcent + '%' : '—' }}
               </p>
               <p class="text-xs text-slate-500 mt-1">score moyen</p>
@@ -78,7 +78,7 @@ onMounted(charger)
           </div>
         </section>
 
-        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6">
           <h2 class="text-base font-semibold text-slate-800 mb-4">Par matière</h2>
           <div class="space-y-3">
             <div
@@ -107,7 +107,7 @@ onMounted(charger)
                   {{ ligne.score_moyen_pourcent !== null ? ligne.score_moyen_pourcent + '%' : '—' }}
                 </span>
               </div>
-              <div class="flex gap-6 text-xs text-slate-500">
+              <div class="flex flex-wrap gap-x-4 sm:gap-x-6 gap-y-1 text-xs text-slate-500">
                 <span>{{ ligne.lecons_lues }} leçon{{ ligne.lecons_lues > 1 ? 's' : '' }} lue{{ ligne.lecons_lues > 1 ? 's' : '' }}</span>
                 <span>{{ ligne.qcm_termines }} QCM terminé{{ ligne.qcm_termines > 1 ? 's' : '' }}</span>
               </div>

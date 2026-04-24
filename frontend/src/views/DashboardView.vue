@@ -92,12 +92,12 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200">
-      <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
         <div>
-          <h1 class="text-xl font-semibold text-slate-800">Bonjour, {{ auth.utilisateur?.first_name || auth.utilisateur?.username }}</h1>
-          <p class="text-sm text-slate-500">Portail éducatif — 3<sup>e</sup></p>
+          <h1 class="text-lg sm:text-xl font-semibold text-slate-800">Bonjour, {{ auth.utilisateur?.first_name || auth.utilisateur?.username }}</h1>
+          <p class="text-xs sm:text-sm text-slate-500">Portail éducatif — 3<sup>e</sup></p>
         </div>
-        <nav class="flex items-center gap-4 text-sm">
+        <nav class="flex items-center gap-3 sm:gap-4 text-sm">
           <router-link to="/historique" class="text-slate-600 hover:text-slate-900">
             Historique
           </router-link>
@@ -115,16 +115,16 @@ onMounted(charger)
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-6">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
       <template v-else>
         <section
           v-if="thematique"
-          class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-4"
+          class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4"
         >
-          <div class="flex items-baseline justify-between border-b border-slate-100 pb-3">
+          <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 border-b border-slate-100 pb-3">
             <p class="text-sm text-slate-500">Suggestion du {{ dateAujourdhui }}</p>
             <p class="text-sm font-medium text-indigo-700">
               Brevet des collèges — J-{{ joursAvantBrevet }}
@@ -148,7 +148,7 @@ onMounted(charger)
             {{ thematique.objectifs_apprentissage }}
           </p>
 
-          <div class="flex gap-3 pt-2">
+          <div class="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
               :disabled="!thematique.lecon_disponible"
@@ -170,7 +170,7 @@ onMounted(charger)
 
         <section
           v-if="progression"
-          class="bg-white rounded-lg shadow-sm border border-slate-200 p-6"
+          class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6"
         >
           <h3 class="text-lg font-semibold text-slate-800 mb-3">Ma progression</h3>
           <div class="grid grid-cols-3 gap-4 text-center">
@@ -197,7 +197,7 @@ onMounted(charger)
 
         <section
           v-if="matieres.length"
-          class="bg-white rounded-lg shadow-sm border border-slate-200 p-6"
+          class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6"
         >
           <h3 class="text-lg font-semibold text-slate-800 mb-4">Explorer par matière</h3>
           <div class="space-y-2">

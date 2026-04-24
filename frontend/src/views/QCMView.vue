@@ -138,19 +138,19 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-      <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="max-w-3xl mx-auto px-4 py-3 sm:px-6 flex items-center justify-between gap-3">
         <button
           type="button"
-          class="text-sm text-slate-600 hover:text-slate-900"
+          class="text-sm text-slate-600 hover:text-slate-900 shrink-0"
           @click="revenirAuDashboard"
         >
           ← Retour
         </button>
-        <div v-if="donnees && !scoreFinal" class="flex items-center gap-1.5">
+        <div v-if="donnees && !scoreFinal" class="flex flex-wrap items-center gap-1 sm:gap-1.5 justify-end">
           <span
             v-for="(q, i) in donnees.questions"
             :key="q.id"
-            class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold cursor-pointer"
+            class="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-xs font-semibold cursor-pointer"
             :class="[
               classeIndicateur(i),
               i === indexCourant ? 'ring-2 ring-offset-1 ring-indigo-500' : '',
@@ -163,14 +163,14 @@ onMounted(charger)
       </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-6 py-8">
+    <main class="max-w-3xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
       <!-- Écran de résultat -->
       <section
         v-else-if="scoreFinal"
-        class="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center space-y-4"
+        class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-8 text-center space-y-4"
       >
         <h2 class="text-3xl font-semibold text-slate-800">QCM terminé !</h2>
         <p class="text-5xl font-bold text-indigo-600">
@@ -197,7 +197,7 @@ onMounted(charger)
       <!-- Écran de question -->
       <section
         v-else-if="questionCourante"
-        class="bg-white rounded-lg shadow-sm border border-slate-200 p-8 space-y-5"
+        class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-8 space-y-5"
       >
         <p class="text-sm text-slate-500">
           Question {{ indexCourant + 1 }} / {{ nbQuestions }}

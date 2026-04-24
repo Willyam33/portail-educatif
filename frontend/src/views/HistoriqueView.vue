@@ -55,20 +55,20 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-      <div class="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 flex items-center justify-between gap-3">
         <button
           type="button"
-          class="text-sm text-slate-600 hover:text-slate-900"
+          class="text-sm text-slate-600 hover:text-slate-900 shrink-0"
           @click="retour"
         >
           ← Retour
         </button>
-        <h1 class="text-lg font-semibold text-slate-800">Mon historique</h1>
-        <span class="text-sm text-slate-400">{{ entrees.length }} thématique(s)</span>
+        <h1 class="text-base sm:text-lg font-semibold text-slate-800 truncate">Mon historique</h1>
+        <span class="text-xs sm:text-sm text-slate-400 shrink-0">{{ entrees.length }}</span>
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-4">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-4">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
@@ -82,7 +82,7 @@ onMounted(charger)
         :key="entree.thematique_id"
         class="bg-white rounded-lg shadow-sm border border-slate-200 p-5"
       >
-        <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span
@@ -95,10 +95,10 @@ onMounted(charger)
                 {{ formaterDate(entree.date) }}
               </span>
             </div>
-            <h2 class="mt-1 text-lg font-semibold text-slate-800">
+            <h2 class="mt-1 text-base sm:text-lg font-semibold text-slate-800">
               {{ entree.titre }}
             </h2>
-            <div class="mt-2 flex items-center gap-3 text-sm">
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span
                 v-if="entree.lecon_lue"
                 class="inline-flex items-center gap-1 text-emerald-700"
@@ -119,10 +119,10 @@ onMounted(charger)
             </div>
           </div>
 
-          <div class="flex flex-col gap-2 shrink-0">
+          <div class="flex flex-row sm:flex-col gap-4 sm:gap-2 shrink-0">
             <button
               type="button"
-              class="text-sm text-indigo-600 hover:underline"
+              class="text-sm text-indigo-600 hover:underline text-left"
               @click="ouvrirLecon(entree)"
             >
               Revoir la leçon
@@ -130,7 +130,7 @@ onMounted(charger)
             <button
               v-if="entree.qcm_termine"
               type="button"
-              class="text-sm text-emerald-600 hover:underline"
+              class="text-sm text-emerald-600 hover:underline text-left"
               @click="ouvrirQCM(entree)"
             >
               Refaire le QCM

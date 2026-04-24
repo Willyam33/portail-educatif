@@ -60,10 +60,10 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-      <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="max-w-3xl mx-auto px-4 py-3 sm:px-6 flex items-center justify-between gap-3">
         <button
           type="button"
-          class="text-sm text-slate-600 hover:text-slate-900"
+          class="text-sm text-slate-600 hover:text-slate-900 shrink-0"
           @click="retour"
         >
           ← Retour
@@ -71,20 +71,20 @@ onMounted(charger)
         <button
           v-if="donnees"
           type="button"
-          class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded hover:bg-emerald-700"
+          class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded hover:bg-emerald-700 shrink-0"
           @click="marquerLueEtPasserAuQCM"
         >
-          J'ai lu, passer au QCM →
+          <span class="hidden sm:inline">J'ai lu, passer au </span>QCM →
         </button>
       </div>
     </header>
 
-    <main class="max-w-3xl mx-auto px-6 py-8">
+    <main class="max-w-3xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
       <template v-else-if="donnees">
-        <article class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+        <article class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-8">
           <div class="mb-4">
             <span
               class="inline-block px-2 py-0.5 rounded text-xs font-medium text-white"
