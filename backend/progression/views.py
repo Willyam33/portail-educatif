@@ -1,13 +1,13 @@
 """Vues API « progression » — réponses QCM, tentatives, récapitulatif élève."""
 
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Exists, OuterRef, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contenu.models import Matiere, Proposition, QuestionQCM
+from contenu.models import Lecon, Matiere, Proposition, QuestionQCM, Thematique
 from contenu.serializers import (
     CorrectionReponseSerializer,
     MatiereSerializer,
@@ -141,10 +141,17 @@ class ProgressionMeView(APIView):
             )
             .order_by("thematique__matiere__ordre")
         )
+        total_lecons = Lecon.objects.count()
+        total_qcm = Thematique.objects.annotate(
+            has_qcm=Exists(QuestionQCM.objects.filter(thematique=OuterRef("pk")))
+        ).filter(has_qcm=True).count()
+
         return Response(
             {
                 "lecons_lues": lecons_lues,
+                "total_lecons": total_lecons,
                 "qcm_termines": nb_tentatives,
+                "total_qcm": total_qcm,
                 "score_moyen_pourcent": score_moyen,
                 "par_matiere": par_matiere,
             }
@@ -187,6 +194,20 @@ class ProgressionDetailleeView(APIView):
                 .annotate(nb=Count("id"))
             )
         }
+        total_lecons_par_matiere = dict(
+            Lecon.objects.values_list("thematique__matiere_id")
+            .annotate(nb=Count("id"))
+            .values_list("thematique__matiere_id", "nb")
+        )
+        total_qcm_par_matiere = dict(
+            Thematique.objects.annotate(
+                has_qcm=Exists(QuestionQCM.objects.filter(thematique=OuterRef("pk")))
+            )
+            .filter(has_qcm=True)
+            .values_list("matiere_id")
+            .annotate(nb=Count("id"))
+            .values_list("matiere_id", "nb")
+        )
 
         resultat = []
         for matiere in matieres:
@@ -203,7 +224,9 @@ class ProgressionDetailleeView(APIView):
                 {
                     "matiere": MatiereSerializer(matiere).data,
                     "lecons_lues": lecons_par_matiere.get(matiere.id, 0),
+                    "total_lecons": total_lecons_par_matiere.get(matiere.id, 0),
                     "qcm_termines": nb_qcm,
+                    "total_qcm": total_qcm_par_matiere.get(matiere.id, 0),
                     "score_moyen_pourcent": score_pourcent,
                 }
             )

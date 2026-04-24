@@ -12,14 +12,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Exists, OuterRef, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contenu.models import Matiere
+from contenu.models import Lecon, Matiere, QuestionQCM, Thematique
 from contenu.serializers import (
     MatiereSerializer,
     ThematiqueDetailSerializer,
@@ -120,6 +120,21 @@ class SuiviEleveView(APIView):
             )
         }
 
+        total_lecons_par_matiere = dict(
+            Lecon.objects.values_list("thematique__matiere_id")
+            .annotate(nb=Count("id"))
+            .values_list("thematique__matiere_id", "nb")
+        )
+        total_qcm_par_matiere = dict(
+            Thematique.objects.annotate(
+                has_qcm=Exists(QuestionQCM.objects.filter(thematique=OuterRef("pk")))
+            )
+            .filter(has_qcm=True)
+            .values_list("matiere_id")
+            .annotate(nb=Count("id"))
+            .values_list("matiere_id", "nb")
+        )
+
         par_matiere = []
         for matiere in Matiere.objects.all().order_by("ordre"):
             stats = tentatives_par_matiere.get(matiere.id)
@@ -129,12 +144,17 @@ class SuiviEleveView(APIView):
                 {
                     "matiere": MatiereSerializer(matiere).data,
                     "lecons_lues": lecons_par_matiere.get(matiere.id, 0),
+                    "total_lecons": total_lecons_par_matiere.get(matiere.id, 0),
                     "qcm_termines": stats["nb"] if stats else 0,
+                    "total_qcm": total_qcm_par_matiere.get(matiere.id, 0),
                     "score_moyen_pourcent": (
                         round(100 * total_s / total_q, 1) if total_q else None
                     ),
                 }
             )
+
+        total_lecons = Lecon.objects.count()
+        total_qcm = sum(total_qcm_par_matiere.values())
 
         nb_questions_libres = QuestionLibre.objects.filter(eleve=eleve).count()
 
@@ -147,7 +167,9 @@ class SuiviEleveView(APIView):
                     "last_name": eleve.last_name,
                 },
                 "lecons_lues": lecons_lues,
+                "total_lecons": total_lecons,
                 "qcm_termines": nb_tentatives,
+                "total_qcm": total_qcm,
                 "score_moyen_pourcent": score_moyen,
                 "nb_questions_libres": nb_questions_libres,
                 "par_matiere": par_matiere,

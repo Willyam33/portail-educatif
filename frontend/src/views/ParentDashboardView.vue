@@ -39,16 +39,16 @@ onMounted(charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200">
-      <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
         <div>
-          <h1 class="text-xl font-semibold text-slate-800">
+          <h1 class="text-lg sm:text-xl font-semibold text-slate-800">
             Espace parent — {{ auth.utilisateur?.first_name || auth.utilisateur?.username }}
           </h1>
-          <p class="text-sm text-slate-500">Suivi de mes enfants</p>
+          <p class="text-xs sm:text-sm text-slate-500">Suivi de mes enfants</p>
         </div>
         <button
           type="button"
-          class="text-sm text-slate-600 hover:text-slate-900 underline"
+          class="text-sm text-slate-600 hover:text-slate-900 underline self-start sm:self-auto"
           @click="deconnexion"
         >
           Se déconnecter
@@ -56,7 +56,7 @@ onMounted(charger)
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-6">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
       <p v-else-if="enfants.length === 0" class="text-slate-600">

@@ -54,36 +54,40 @@ watch(eleveId, charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200">
-      <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between">
         <div>
           <router-link :to="{ name: 'parent' }" class="text-sm text-slate-500 hover:text-slate-800">
             ← Tous les enfants
           </router-link>
-          <h1 v-if="suivi" class="text-xl font-semibold text-slate-800 mt-1">
+          <h1 v-if="suivi" class="text-lg sm:text-xl font-semibold text-slate-800 mt-1">
             Suivi de {{ suivi.eleve.first_name || suivi.eleve.username }}
           </h1>
         </div>
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-6">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
 
       <template v-else-if="suivi">
-        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-          <h2 class="text-lg font-semibold text-slate-800 mb-3">Vue d'ensemble</h2>
-          <div class="grid grid-cols-4 gap-4 text-center">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6">
+          <h2 class="text-base sm:text-lg font-semibold text-slate-800 mb-3">Vue d'ensemble</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
             <div>
-              <p class="text-2xl font-semibold text-slate-800">{{ suivi.lecons_lues }}</p>
+              <p class="text-xl sm:text-2xl font-semibold text-slate-800">
+                {{ suivi.lecons_lues }} / {{ suivi.total_lecons }}
+              </p>
               <p class="text-xs text-slate-500">leçons lues</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold text-slate-800">{{ suivi.qcm_termines }}</p>
+              <p class="text-xl sm:text-2xl font-semibold text-slate-800">
+                {{ suivi.qcm_termines }} / {{ suivi.total_qcm }}
+              </p>
               <p class="text-xs text-slate-500">QCM terminés</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold text-slate-800">
+              <p class="text-xl sm:text-2xl font-semibold text-slate-800">
                 {{
                   suivi.score_moyen_pourcent !== null
                     ? suivi.score_moyen_pourcent + '%'
@@ -93,13 +97,13 @@ watch(eleveId, charger)
               <p class="text-xs text-slate-500">score moyen</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold text-slate-800">{{ suivi.nb_questions_libres }}</p>
+              <p class="text-xl sm:text-2xl font-semibold text-slate-800">{{ suivi.nb_questions_libres }}</p>
               <p class="text-xs text-slate-500">questions posées</p>
             </div>
           </div>
         </section>
 
-        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6">
           <h2 class="text-lg font-semibold text-slate-800 mb-4">Par matière</h2>
           <div class="space-y-3">
             <div
@@ -114,10 +118,10 @@ watch(eleveId, charger)
                 ></span>
                 <span class="text-slate-700">{{ stats.matiere.nom }}</span>
               </div>
-              <div class="text-sm text-slate-500 flex gap-4">
-                <span>{{ stats.lecons_lues }} leçon(s)</span>
-                <span>{{ stats.qcm_termines }} QCM</span>
-                <span class="font-medium text-slate-700 w-14 text-right">
+              <div class="text-sm text-slate-500 flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 items-center">
+                <span>{{ stats.lecons_lues }} / {{ stats.total_lecons }} leçon(s)</span>
+                <span>{{ stats.qcm_termines }} / {{ stats.total_qcm }} QCM</span>
+                <span class="font-medium text-slate-700 text-right sm:w-14 ml-auto sm:ml-0">
                   {{
                     stats.score_moyen_pourcent !== null
                       ? stats.score_moyen_pourcent + '%'
@@ -129,7 +133,7 @@ watch(eleveId, charger)
           </div>
         </section>
 
-        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6">
           <h2 class="text-lg font-semibold text-slate-800 mb-3">Zoom sur une journée</h2>
           <div class="flex flex-wrap items-center gap-3">
             <input
@@ -147,7 +151,7 @@ watch(eleveId, charger)
           </div>
         </section>
 
-        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 sm:p-6">
           <h2 class="text-lg font-semibold text-slate-800 mb-2">Questions libres</h2>
           <p class="text-sm text-slate-600 mb-3">
             {{ suivi.nb_questions_libres }} question(s) posée(s) à l'IA.

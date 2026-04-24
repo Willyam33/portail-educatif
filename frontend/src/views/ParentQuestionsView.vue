@@ -52,20 +52,20 @@ watch(eleveId, charger)
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="bg-white border-b border-slate-200">
-      <div class="max-w-4xl mx-auto px-6 py-4">
+      <div class="max-w-4xl mx-auto px-4 py-3 sm:px-6 sm:py-4">
         <router-link
           :to="{ name: 'parent-suivi', params: { eleveId } }"
           class="text-sm text-slate-500 hover:text-slate-800"
         >
           ← Retour au suivi
         </router-link>
-        <h1 class="text-xl font-semibold text-slate-800 mt-1">
+        <h1 class="text-lg sm:text-xl font-semibold text-slate-800 mt-1">
           Questions posées à l'IA
         </h1>
       </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-6 py-8 space-y-4">
+    <main class="max-w-4xl mx-auto px-4 py-6 sm:px-6 sm:py-8 space-y-4">
       <p v-if="chargement" class="text-slate-500">Chargement…</p>
       <p v-else-if="erreur" class="text-red-600">{{ erreur }}</p>
       <p v-else-if="questions.length === 0" class="text-slate-600">

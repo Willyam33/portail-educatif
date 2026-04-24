@@ -62,11 +62,15 @@ onMounted(charger)
           <h2 class="text-base font-semibold text-slate-800 mb-3">Vue d'ensemble</h2>
           <div class="grid grid-cols-3 gap-2 sm:gap-4 text-center">
             <div>
-              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">{{ global.lecons_lues }}</p>
+              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">
+                {{ global.lecons_lues }} / {{ global.total_lecons }}
+              </p>
               <p class="text-xs text-slate-500 mt-1">leçons lues</p>
             </div>
             <div>
-              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">{{ global.qcm_termines }}</p>
+              <p class="text-2xl sm:text-3xl font-semibold text-slate-800">
+                {{ global.qcm_termines }} / {{ global.total_qcm }}
+              </p>
               <p class="text-xs text-slate-500 mt-1">QCM terminés</p>
             </div>
             <div>
@@ -108,8 +112,8 @@ onMounted(charger)
                 </span>
               </div>
               <div class="flex flex-wrap gap-x-4 sm:gap-x-6 gap-y-1 text-xs text-slate-500">
-                <span>{{ ligne.lecons_lues }} leçon{{ ligne.lecons_lues > 1 ? 's' : '' }} lue{{ ligne.lecons_lues > 1 ? 's' : '' }}</span>
-                <span>{{ ligne.qcm_termines }} QCM terminé{{ ligne.qcm_termines > 1 ? 's' : '' }}</span>
+                <span>{{ ligne.lecons_lues }} / {{ ligne.total_lecons }} leçon{{ ligne.total_lecons > 1 ? 's' : '' }} lue{{ ligne.lecons_lues > 1 ? 's' : '' }}</span>
+                <span>{{ ligne.qcm_termines }} / {{ ligne.total_qcm }} QCM terminé{{ ligne.qcm_termines > 1 ? 's' : '' }}</span>
               </div>
               <div
                 v-if="ligne.score_moyen_pourcent !== null"
